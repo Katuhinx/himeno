@@ -1,19 +1,18 @@
 #!/bin/sh
 
-dvmdir='/home/katrin/DVM/dvm_sys'
-export dvmbuild='Version 5.0, platform katrin-Virtual-Machine, build 1'
+dvmdir='/home/katrin/dvm/dvm_sys'
+export dvmbuild='Version 5.0, revision 8512, platform katrin-Virtual-Machine, build 1'
 
 #--------------- One can customize compiler options:
-# export PCC='mpicc -g -O2 -fopenmp' # C compiler
-# export PCXX='mpic++ -g -O2 -fopenmp' # C++ compiler
-# export PFORT='mpif90 -g -O2 -fopenmp' # Fortran compiler
+# export PCC='cc -g -O2 -fopenmp' # C compiler
+# export PCXX='c++ -g -O2 -fopenmp' # C++ compiler
+# export PFORT='f95 -g -O2 -fopenmp' # Fortran compiler
 
 #--------------- One can add libraries (additional linker flags):
 # export USER_LIBS=''
 
 #--------------- One can set launch options:
 # export dvmwait=0 # Wait for task completion
-# export DVMH_PPN='' # Number of processes per node
 # export DVMH_STACKSIZE='' # Stack size to set for the task
 # export DVMH_NUM_THREADS='' # Number of CPU threads per process
 

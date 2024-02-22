@@ -40,6 +40,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#ifdef _XCALABLEMP
+#include <xmp.h>
+#endif
+
 
 #define MR(mt,n,r,c,d)  mt->m[(n) * mt->mrows * mt->mcols * mt->mdeps + (r) * mt->mcols* mt->mdeps + (c) * mt->mdeps + (d)]
 
@@ -59,8 +63,7 @@ void clearMat(Matrix* Mat);
 void set_param(int i[],char *size);
 void mat_set(Matrix* Mat,int l,float z);
 void mat_set_init(Matrix* Mat);
-float jacobi(int n,Matrix* M1,Matrix* M2,Matrix* M3,
-             Matrix* M4,Matrix* M5,Matrix* M6,Matrix* M7);
+float jacobi(int n,Matrix* M1,Matrix* M2,Matrix* M3, Matrix* M4,Matrix* M5,Matrix* M6,Matrix* M7);
 double fflop(int,int,int);
 double mflops(int,double,double);
 double second();
@@ -69,8 +72,27 @@ float   omega=0.8;
 
 Matrix  a,b,c,p1,bnd,wrk1,wrk2,p;
 
-int
-main(int argc, char *argv[])
+#pragma xmp template t [mkmax-1][mjmax-1][mimax-1] //шаблон для матрицы 
+#pragma xmp nodes n[2][2][2]// выделяем 4 узла || 8 узлов
+#pragma xmp distribute t[block][block][block] onto n // распределяет массив t между набором узлов n
+#pragma xmp align p[k][j][i] with t(i, j, k)//выравниваем массив p по нашему шаблону t
+#pragma xmp align bnd[k][j][i] with t(i, j, k)
+#pragma xmp align wrk1[k][j][i] with t(i, j, k)
+#pragma xmp align wrk2[k][j][i] with t(i, j, k)
+#pragma xmp align a[k][j][i] with t(i, j, k)
+#pragma xmp align b[k][j][i] with t(i, j, k)
+#pragma xmp align c[k][j][i] with t(i, j, k)
+#pragma xmp shadow p[1:1][1:1][1:1]//определяем теневые грани массива p
+#pragma xmp shadow bnd[1][1][1]
+#pragma xmp shadow wrk1[1][1][1]
+#pragma xmp shadow wrk2[1][1][1]
+#pragma xmp shadow a[1][1][1]
+#pragma xmp shadow b[1][1][1]
+#pragma xmp shadow c[1][1][1]
+
+
+
+int main(int argc, char *argv[])
 {
   int    i,j,k,nn;
   int    imax,jmax,kmax,mimax,mjmax,mkmax,msize[3];
@@ -93,7 +115,6 @@ main(int argc, char *argv[])
   }
 
   set_param(msize,size);
-  
   mimax= msize[0];
   mjmax= msize[1];
   mkmax= msize[2];
@@ -103,9 +124,17 @@ main(int argc, char *argv[])
 
   target = 60.0;
 
-  printf("mimax = %d mjmax = %d mkmax = %d\n",mimax,mjmax,mkmax);
-  printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
-
+ // #pragma xmp tasks
+  {
+   // #pragma xmp task on 
+    {
+      printf("mimax = %d mjmax = %d mkmax = %d\n",mimax,mjmax,mkmax);
+    }
+   // #pragma xmp task on
+    {
+      printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
+    }
+  }
   /*
    *    Initializing matrixes
    */
@@ -117,7 +146,7 @@ main(int argc, char *argv[])
   newMat(&b,3,mimax,mjmax,mkmax);
   newMat(&c,3,mimax,mjmax,mkmax);
 
-
+ 
   mat_set_init(&p);
   mat_set(&bnd,0,1.0);
   mat_set(&wrk1,0,0.0);
@@ -181,20 +210,17 @@ main(int argc, char *argv[])
   return (0);
 }
 
-double
-fflop(int mx,int my, int mz)
+double fflop(int mx,int my, int mz)
 {
   return((double)(mz-2)*(double)(my-2)*(double)(mx-2)*34.0);
 }
 
-double
-mflops(int nn,double cpu,double flop)
+double mflops(int nn,double cpu,double flop)
 {
   return(flop/cpu*1.e-6*(double)nn);
 }
 
-void
-set_param(int is[],char *size)
+void set_param(int is[],char *size)
 {
   if(!strcmp(size,"XS") || !strcmp(size,"xs")){
     is[0]= 32;
@@ -231,22 +257,19 @@ set_param(int is[],char *size)
   }
 }
 
-int
-newMat(Matrix* Mat, int mnums,int mrows, int mcols, int mdeps)
+int newMat(Matrix* Mat, int mnums,int mrows, int mcols, int mdeps)
 {
   Mat->mnums= mnums;
   Mat->mrows= mrows;
   Mat->mcols= mcols;
   Mat->mdeps= mdeps;
   Mat->m= NULL;
-  Mat->m= (float*)malloc(mnums * mrows * mcols * mdeps * sizeof(float));
-  #pragma dvm redistribute (Mat[block][block][block])  
+  Mat->m= (float*) malloc(mnums * mrows * mcols * mdeps * sizeof(float));
   
   return(Mat->m != NULL) ? 1:0;
 }
 
-void
-clearMat(Matrix* Mat)
+void clearMat(Matrix* Mat)
 {
   if(Mat->m)
     free(Mat->m);
@@ -257,34 +280,29 @@ clearMat(Matrix* Mat)
   Mat->mdeps= 0;
 }
 
-void
-mat_set(Matrix* Mat, int l, float val)
+void mat_set(Matrix* Mat, int l, float val)
 {
   int i,j,k;
   
-#pragma dvm parallel([i][j][k] on Mat[i][j][k])
-for(i=0; i<Mat->mrows; i++)
-  for(j=0; j<Mat->mcols; j++)
-    for(k=0; k<Mat->mdeps; k++)
-      MR(Mat,l,i,j,k)= val;
+  //  #pragma цикл
+  for(i=0; i<Mat->mrows; i++)
+    for(j=0; j<Mat->mcols; j++)
+      for(k=0; k<Mat->mdeps; k++)
+        MR(Mat,l,i,j,k)= val;
 }
 
-void
-mat_set_init(Matrix* Mat)
+void mat_set_init(Matrix* Mat)
 {
   int  i,j,k,l;
   float tt;
-
-  #pragma dvm parallel([i][j][k] on A[i][j][k])
+  
   for(i=0; i<Mat->mrows; i++)
     for(j=0; j<Mat->mcols; j++)
       for(k=0; k<Mat->mdeps; k++)
         MR(Mat,0,i,j,k)= (float)(i*i)/(float)((Mat->mrows - 1)*(Mat->mrows - 1));
 }
 
-float
-jacobi(int nn, Matrix* a,Matrix* b,Matrix* c,
-       Matrix* p,Matrix* bnd,Matrix* wrk1,Matrix* wrk2)
+float jacobi(int nn, Matrix* a,Matrix* b,Matrix* c, Matrix* p,Matrix* bnd,Matrix* wrk1,Matrix* wrk2)
 {
   int    i,j,k,n,imax,jmax,kmax;
   float  gosa,s0,ss;
@@ -293,12 +311,9 @@ jacobi(int nn, Matrix* a,Matrix* b,Matrix* c,
   jmax= p->mcols-1;
   kmax= p->mdeps-1;
 
-  #pragma dvm region
   for(n=0 ; n<nn ; n++){
     gosa = 0.0;
 
-    #pragma dvm array align([i][j][k] with A[i][j][k])
-    #pragma dvm parallel([i][j][k] on A[i][j][k])
     for(i=1 ; i<imax; i++)
       for(j=1 ; j<jmax ; j++)
         for(k=1 ; k<kmax ; k++){
@@ -325,7 +340,6 @@ jacobi(int nn, Matrix* a,Matrix* b,Matrix* c,
           MR(wrk2,0,i,j,k)= MR(p,0,i,j,k) + omega*ss;
         }
 
-    #pragma dvm parallel([i][j][k] on A[i][j][k])
     for(i=1 ; i<imax ; i++)
       for(j=1 ; j<jmax ; j++)
         for(k=1 ; k<kmax ; k++)
@@ -336,27 +350,22 @@ jacobi(int nn, Matrix* a,Matrix* b,Matrix* c,
   return(gosa);
 }
 
-double
-second()
+double second()
 {
-
   struct timeval tm;
-  double t ;
-
-  static int base_sec = 0,base_usec = 0;
+  static int base_sec = 0;
+  static int base_usec = 0;
 
   gettimeofday(&tm, NULL);
   
-  if(base_sec == 0 && base_usec == 0)
-    {
-      base_sec = tm.tv_sec;
-      base_usec = tm.tv_usec;
-      t = 0.0;
+  if(base_sec == 0 && base_usec == 0) 
+  {
+    base_sec = tm.tv_sec;
+    base_usec = tm.tv_usec;
+    return 0.0;
   } else {
-    t = (double) (tm.tv_sec-base_sec) + 
-      ((double) (tm.tv_usec-base_usec))/1.0e6 ;
+    return (double) (tm.tv_sec-base_sec) + ((double) (tm.tv_usec-base_usec))/1.0e6;
   }
-
-  return t ;
 }
+
 

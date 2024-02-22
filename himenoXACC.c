@@ -46,6 +46,7 @@
 float jacobi(int);
 int initmax(int,int,int);
 void initmt(void);
+
 void sendp(int,int,int);
 void sendp1(void);
 void sendp2(void);
@@ -192,6 +193,12 @@ main(int argc,char *argv[])
 
   return (0);
 }
+
+
+
+
+
+
 
 double
 fflop(int mx,int my, int mz)

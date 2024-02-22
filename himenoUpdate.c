@@ -278,8 +278,7 @@ jacobi(int nn)
   for(n=0 ; n<nn ; n++){
     gosa = 0.0;
 
-    #pragma dvm array align([i][j][k] with A[i][j][k])
-    #pragma dvm parallel([i][j][k] on A[i][j][k])
+    
     for(i=1 ; i<imax; i++)
       for(j=1 ; j<jmax ; j++)
         for(k=1 ; k<kmax ; k++){

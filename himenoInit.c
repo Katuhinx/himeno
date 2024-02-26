@@ -14,7 +14,7 @@
  ---------------------------------------------------------------
  You can adjust the size of this benchmark code to fit your target
  computer. In that case, please chose following sets of
- [mimax][mjmax][mkmax]:
+ (mimax,mjmax,mkmax):
  small : 33,33,65
  small : 65,65,129
  midium: 129,129,257
@@ -37,132 +37,172 @@
 ********************************************************************/
 
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/time.h>
+#define SSMALL
+#include "parametr.h"
 
-//#define MR(mt,n,r,c,d)  mt->m[(n) * mt->mrows * mt->mcols * mt->mdeps + (r) * mt->mcols* mt->mdeps + (c) * mt->mdeps + (d)]
 
-// struct Mat {
-//   float* m;
-//   int mnums;
-//   int mrows;
-//   int mcols;
-//   int mdeps;
-// };
 
-/* prototypes */
-//typedef struct Mat Matrix;
-
-void newMat(void);//инициализация матрицы
-//void clearMat(Matrix* Mat);
-//void set_param(int i[],char *size);
-//void mat_set(Matrix* Mat,int l,float z);
-//void mat_set_init(Matrix* Mat);
-
-float jacobi(int n);// реализация алгоритма якоби
-
-double fflop(int,int,int);//функции которые считают флопсы и время
-double mflops(int,double,double);
 double second();
+float jacobi();
+void initmt();
+double fflop(int,int,int);
+double mflops(int,double,double);
 
-static float  p[i1][j1][k1],
-              a[4][i1][j1][k1],
-              b[3][i1][j1][k1],
-              c[3][i1][j1][k1],
-              bnd[i1][j1][k1],
-              wrk1[i1][j1][k1],
-              wrk2[i1][j1][k1];
-float   omega=0.8;
+static float  p[MIMAX][MJMAX][MKMAX];
+static float  a[4][MIMAX][MJMAX][MKMAX],
+              b[3][MIMAX][MJMAX][MKMAX],
+              c[3][MIMAX][MJMAX][MKMAX];
+static float  bnd[MIMAX][MJMAX][MKMAX];
+static float  wrk1[MIMAX][MJMAX][MKMAX],
+              wrk2[MIMAX][MJMAX][MKMAX];
 
-//Matrix  a,b,c,p1,bnd,wrk1,wrk2,p;
-
-
-
-
+static int imax, jmax, kmax;
+static float omega;
 
 int
-main(int argc, char *argv[])
+main()
 {
   int    i,j,k,nn;
-  int    imax,jmax,kmax,mimax,mjmax,mkmax,msize[3];
-  float  gosa,target;
-  double  cpu0,cpu1,cpu,flop;
-  char   size[10];
+  float  gosa;
+  double cpu,cpu0,cpu1,flop,target;
 
-  if(argc == 2){
-    strcpy(size,argv[1]);
-  } else {
-    printf("For example: \n");
-    printf(" Grid-size= XS (32x32x64)\n");
-    printf("\t    S  (64x64x128)\n");
-    printf("\t    M  (128x128x256)\n");
-    printf("\t    L  (256x256x512)\n");
-    printf("\t    XL (512x512x1024)\n\n");
-    printf("Grid-size = ");
-    scanf("%s",size);
-    printf("\n");
-  }
+  target= 60.0;
+  omega= 0.8;
+  imax = MIMAX-1;
+  jmax = MJMAX-1;
+  kmax = MKMAX-1;
 
-  set_param(msize,size);
-  
-  mimax= msize[0];
-  mjmax= msize[1];
-  mkmax= msize[2];
-  imax= mimax-1;
-  jmax= mjmax-1;
-  kmax= mkmax-1;
-
-  target = 60.0;
-
-  newMat();//инициализация
-
-  printf("mimax = %d mjmax = %d mkmax = %d\n",mimax,mjmax,mkmax);
+  /*
+   *    Initializing matrixes
+   */
+  initmt();
+  printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
 
-   /*
-   *    Start measuring
-   */
-
-  nn= 3; // 3 итерации алгоритма якоби
+  nn= 3;//3 итерации алгоритма Якоби
   printf(" Start rehearsal measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
 
   cpu0= second();
   gosa= jacobi(nn);
   cpu1= second();
-  cpu= cpu1 - cpu0; //время выполнения якоби
-  flop= fflop(imax,jmax,kmax);
+  cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
 
+  flop= fflop(imax,jmax,kmax);//флопсы
+  
   printf(" MFLOPS: %f time(s): %f %e\n\n",
          mflops(nn,cpu,flop),cpu,gosa);
 
-  nn= (int)(target/(cpu/3.0));//общее количество итераций которое можно выполнить за минуту
+  nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
 
   printf(" Now, start the actual measurement process.\n");
   printf(" The loop will be excuted in %d times\n",nn);
   printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
 
+  /*
+   *    Start measuring
+   */
   cpu0 = second();
   gosa = jacobi(nn);
   cpu1 = second();
-  cpu = cpu1 - cpu0;
 
-  printf(" Loop executed for %d times\n",nn);// количество итераций
-  printf(" Gosa : %e \n",gosa);//результат выполнения якоби
+  cpu= cpu1 - cpu0;
+  
+  printf(" Loop executed for %d times\n",nn);//количество итераций
+  printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
   printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
-  printf(" Score based on Pentium III 600MHz using Fortran 77: %f / %d\n", mflops(nn,cpu,flop)/82,84);//оценка производительности
-
- 
+  printf(" Score based on Pentium III 600MHz : %f%d\n",
+         mflops(nn,cpu,flop)/82,84);// оценка производительности
   
   return (0);
 }
 
+void
+initmt()
+{
+	int i,j,k;
 
+  for(i=0 ; i<MIMAX ; i++)
+    for(j=0 ; j<MJMAX ; j++)
+      for(k=0 ; k<MKMAX ; k++){
+        a[0][i][j][k]=0.0;
+        a[1][i][j][k]=0.0;
+        a[2][i][j][k]=0.0;
+        a[3][i][j][k]=0.0;
+        b[0][i][j][k]=0.0;
+        b[1][i][j][k]=0.0;
+        b[2][i][j][k]=0.0;
+        c[0][i][j][k]=0.0;
+        c[1][i][j][k]=0.0;
+        c[2][i][j][k]=0.0;
+        p[i][j][k]=0.0;
+        wrk1[i][j][k]=0.0;
+        bnd[i][j][k]=0.0;
+      }
 
+  for(i=0 ; i<imax ; i++)
+    for(j=0 ; j<jmax ; j++)
+      for(k=0 ; k<kmax ; k++){
+        a[0][i][j][k]=1.0;
+        a[1][i][j][k]=1.0;
+        a[2][i][j][k]=1.0;
+        a[3][i][j][k]=1.0/6.0;
+        b[0][i][j][k]=0.0;
+        b[1][i][j][k]=0.0;
+        b[2][i][j][k]=0.0;
+        c[0][i][j][k]=1.0;
+        c[1][i][j][k]=1.0;
+        c[2][i][j][k]=1.0;
+        p[i][j][k]=(float)(i*i)/(float)((imax-1)*(imax-1));
+        wrk1[i][j][k]=0.0;
+        bnd[i][j][k]=1.0;
+      }
+}
 
+float
+jacobi(int nn)
+{
+  int i,j,k,n;
+  float gosa, s0, ss;
 
+  for(n=0 ; n<nn ; ++n){
+    gosa = 0.0;
+
+    for(i=1 ; i<imax-1 ; i++)
+      for(j=1 ; j<jmax-1 ; j++)
+        for(k=1 ; k<kmax-1 ; k++){
+          s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
+             + a[1][i][j][k] * p[i  ][j+1][k  ]
+             + a[2][i][j][k] * p[i  ][j  ][k+1]
+             + b[0][i][j][k] * ( p[i+1][j+1][k  ] - p[i+1][j-1][k  ]
+                              - p[i-1][j+1][k  ] + p[i-1][j-1][k  ] )
+             + b[1][i][j][k] * ( p[i  ][j+1][k+1] - p[i  ][j-1][k+1]
+                               - p[i  ][j+1][k-1] + p[i  ][j-1][k-1] )
+             + b[2][i][j][k] * ( p[i+1][j  ][k+1] - p[i-1][j  ][k+1]
+                               - p[i+1][j  ][k-1] + p[i-1][j  ][k-1] )
+             + c[0][i][j][k] * p[i-1][j  ][k  ]
+             + c[1][i][j][k] * p[i  ][j-1][k  ]
+             + c[2][i][j][k] * p[i  ][j  ][k-1]
+             + wrk1[i][j][k];
+
+          ss = ( s0 * a[3][i][j][k] - p[i][j][k] ) * bnd[i][j][k];
+
+          gosa+= ss*ss;
+          /* gosa= (gosa > ss*ss) ? a : b; */
+
+          wrk2[i][j][k] = p[i][j][k] + omega * ss;
+        }
+
+    for(i=1 ; i<imax-1 ; ++i)
+      for(j=1 ; j<jmax-1 ; ++j)
+        for(k=1 ; k<kmax-1 ; ++k)
+          p[i][j][k] = wrk2[i][j][k];
+    
+  } /* end n loop */
+
+  return(gosa);
+}
 
 double
 fflop(int mx,int my, int mz)
@@ -176,149 +216,10 @@ mflops(int nn,double cpu,double flop)
   return(flop/cpu*1.e-6*(double)nn);
 }
 
-void
-set_param(int is[],char *size)
-{
-  if(!strcmp(size,"XS") || !strcmp(size,"xs")){
-    is[0]= 32;
-    is[1]= 32;
-    is[2]= 64;
-    return;
-  }
-  if(!strcmp(size,"S") || !strcmp(size,"s")){
-    is[0]= 64;
-    is[1]= 64;
-    is[2]= 128;
-    return;
-  }
-  if(!strcmp(size,"M") || !strcmp(size,"m")){
-    is[0]= 128;
-    is[1]= 128;
-    is[2]= 256;
-    return;
-  }
-  if(!strcmp(size,"L") || !strcmp(size,"l")){
-    is[0]= 256;
-    is[1]= 256;
-    is[2]= 512;
-    return;
-  }
-  if(!strcmp(size,"XL") || !strcmp(size,"xl")){
-    is[0]= 512;
-    is[1]= 512;
-    is[2]= 1024;
-    return;
-  } else {
-    printf("Invalid input character !!\n");
-    exit(6);
-  }
-}
-
-void
-newMat()
-{
-  int i,j,k;
-
-  for(i=0 ; i< i1; ++i)
-    for(j=0 ; j< j1; ++j)
-      for(k=0 ; k< k1; ++k)
-      {
-        a[0][i][j][k]=0.0;
-        a[1][i][j][k]=0.0;
-        a[2][i][j][k]=0.0;
-        a[3][i][j][k]=0.0;
-        b[0][i][j][k]=0.0;
-        b[1][i][j][k]=0.0;
-        b[2][i][j][k]=0.0;
-        c[0][i][j][k]=0.0;
-        c[1][i][j][k]=0.0;
-        c[2][i][j][k]=0.0;
-        p[i][j][k]=0.0;
-        wrk1[i][j][k]=0.0;
-        wrk2[i][j][k]=0.0;
-        bnd[i][j][k]=0.0;
-      }
-
-
-  for(i=0 ; i<imax ; ++i)
-    for(j=0 ; j<jmax ; ++j)
-      for(k=0 ; k<kmax ; ++k)
-      {
-        a[0][i][j][k]=1.0;
-        a[1][i][j][k]=1.0;
-        a[2][i][j][k]=1.0;
-        a[3][i][j][k]=1.0/6.0;
-        b[0][i][j][k]=0.0;
-        b[1][i][j][k]=0.0;
-        b[2][i][j][k]=0.0;
-        c[0][i][j][k]=1.0;
-        c[1][i][j][k]=1.0;
-        c[2][i][j][k]=1.0;
-	      p[i][j][k]=(float)((i)*(i))/(float)((imax-1)*(imax-1));
-        wrk1[i][j][k]=0.0;
-        wrk2[i][j][k]=0.0;
-        bnd[i][j][k]=1.0;
-      }
-}
-
-
-
-
-float
-jacobi(int nn)
-{
-  int    i,j,k,n,imax,jmax,kmax;
-  float  gosa,s0,ss;
-
-  imax= p->mrows-1;
-  jmax= p->mcols-1;
-  kmax= p->mdeps-1;
-
- 
-  for(n=0 ; n<nn ; n++){
-    gosa = 0.0;
-
-    
-    for(i=1 ; i<imax; i++)
-      for(j=1 ; j<jmax ; j++)
-        for(k=1 ; k<kmax ; k++){
-           s0 = a[0][i][j][k] * p[i+1][j ][k  ]
-             + a[1][i][j][k] * p[i  ][j+1][k  ]
-             + a[2][i][j][k] * p[i  ][j  ][k+1]
-             + b[0][i][j][k] * ( p[i+1][j+1][k  ] - p[i+1][j-1][k  ]
-                               - p[i-1][j+1][k  ] + p[i-1][j-1][k  ] )
-             + b[1][i][j][k] * ( p[i  ][j+1][k+1] - p[i  ][j-1][k+1]
-                               - p[i  ][j+1][k-1] + p[i  ][j-1][k-1] )
-             + b[2][i][j][k] * ( p[i+1][j  ][k+1] - p[i-1][j  ][k+1]
-                               - p[i+1][j  ][k-1] + p[i-1][j  ][k-1] )
-             + c[0][i][j][k] * p[i-1][j  ][k  ]
-             + c[1][i][j][k] * p[i  ][j-1][k  ]
-             + c[2][i][j][k] * p[i  ][j  ][k-1]
-             + wrk1[i][j][k];
-
-          ss = ( s0 * a[3][i][j][k] - p[i][j][k] ) * bnd[i][j][k];
-          gosa+= ss*ss;
-
-          wrk2[i][j][k] = p[i][j][k] + omega * ss;
-        }
-
-  
-    for(i=1 ; i<imax ; i++)
-      for(j=1 ; j<jmax ; j++)
-        for(k=1 ; k<kmax ; k++)
-          p[i][j][k] = wrk2[i][j][k];
-    
-  } /* end n loop */
-
-  return(gosa);
-}
-
-
-
-
 double
 second()
 {
+#include <sys/time.h>
 
   struct timeval tm;
   double t ;
@@ -339,4 +240,3 @@ second()
 
   return t ;
 }
-

@@ -37,24 +37,16 @@
 ********************************************************************/
 
 #include <stdio.h>
-#include <sys/time.h>
-#ifdef _XCALABLEMP
-#include <xmp.h>
-#endif
-#include "param.h"
+#define SSMALL
+#include "parametr.h"
 
-float jacobi(int);
-int initmax(int,int,int);
-void initmt(void);
 
-void sendp(int,int,int);
-void sendp1(void);
-void sendp2(void);
-void sendp3(void);
 
+double second();
+float jacobi();
+void initmt();
 double fflop(int,int,int);
 double mflops(int,double,double);
-double gettime(void);
 
 static float  p[MIMAX][MJMAX][MKMAX];
 static float  a[4][MIMAX][MJMAX][MKMAX],
@@ -63,142 +55,193 @@ static float  a[4][MIMAX][MJMAX][MKMAX],
 static float  bnd[MIMAX][MJMAX][MKMAX];
 static float  wrk1[MIMAX][MJMAX][MKMAX],
               wrk2[MIMAX][MJMAX][MKMAX];
+
+static int imax, jmax, kmax;
 static float omega;
 
-static int ndx,ndy,ndz;
-static int imax,jmax,kmax;
 
-#pragma xmp template t(0:MKMAX-1, 0:MJMAX-1, 0:MIMAX-1)
-#pragma xmp nodes n(NDZ, NDY, NDX)
-#pragma xmp distribute t(block, block, block) onto n
-#pragma xmp align p[k][j][i] with t(i, j, k)
-#pragma xmp align bnd[k][j][i] with t(i, j, k)
-#pragma xmp align wrk1[k][j][i] with t(i, j, k)
-#pragma xmp align wrk2[k][j][i] with t(i, j, k)
-#pragma xmp align a[*][k][j][i] with t(i, j, k)
-#pragma xmp align b[*][k][j][i] with t(i, j, k)
-#pragma xmp align c[*][k][j][i] with t(i, j, k)
-#pragma xmp shadow p[1:2][1:2][0:1]
-#pragma xmp shadow bnd[1:2][1:2][0:1]
-#pragma xmp shadow wrk1[1:2][1:2][0:1]
-#pragma xmp shadow wrk2[1:2][1:2][0:1]
-#pragma xmp shadow a[0][1:2][1:2][0:1]
-#pragma xmp shadow b[0][1:2][1:2][0:1]
-#pragma xmp shadow c[0][1:2][1:2][0:1]
-double reflect_time = 0, reflect_time0, ave_reflect_time, max_reflect_time;
-#define LOOP_TIMES 100
+#pragma xmp template t[0:MKMAX-1] [0:MJMAX-1] [0:MIMAX-1]//шаблон для матрицы
+#pragma xmp nodes n [2][1][1]// выделяем два узла  --p[0][0][0] и p[1][0][0]
+#pragma xmp distribute t[block] [block] [block] onto n// распределяем массив t между набором узлов n
+#pragma xmp align p[k][j][i] with t[i][j][k]//выравниваем массив p по шаблону t
+#pragma xmp align bnd[k][j][i] with t[i][j][k]
+#pragma xmp align wrk1[k][j][i] with t[i][j][k]
+#pragma xmp align wrk2[k][j][i] with t[i][j][k]
+#pragma xmp align a[*][k][j][i] with t[i][j][k]
+#pragma xmp align b[*][k][j][i] with t[i][j][k]
+#pragma xmp align c[*][k][j][i] with t[i][j][k]
+#pragma xmp shadow p[1][1][1]// определяем теневые грани следующих массивов
+#pragma xmp shadow bnd[1][1][1]
+#pragma xmp shadow wrk1[1][1][1]
+#pragma xmp shadow wrk2[1][1][1]
+#pragma xmp shadow a[0][1][1][1]
+#pragma xmp shadow b[0][1][1][1]
+#pragma xmp shadow c[0][1][1][1]
+
 
 int
-main(int argc,char *argv[])
+main()
 {
-#ifdef _XCALABLEMP
-  int    namelen;
-  char   processor_name[MPI_MAX_PROCESSOR_NAME];
-  MPI_Get_processor_name(processor_name,&namelen);
-  fprintf(stderr, "[%d] %s\n", xmp_node_num(), processor_name);
-#endif
-
   int    i,j,k,nn;
-  int    mx,my,mz,it;
   float  gosa;
   double cpu,cpu0,cpu1,flop,target;
 
   target= 60.0;
   omega= 0.8;
-  mx= MX0-1;
-  my= MY0-1;
-  mz= MZ0-1;
-  ndx= NDX;
-  ndy= NDY;
-  ndz= NDZ;
-
-  imax= mx;
-  jmax= my;
-  kmax= mz;
+  imax = MIMAX-1;
+  jmax = MJMAX-1;
+  kmax = MKMAX-1;
 
   /*
    *    Initializing matrixes
    */
-  initmt();
+  initmt();// инициализация матрицы
 
-#pragma xmp task on t(0,0,0)
+  #pragma xmp task on t[0][0][0]//узел p[0][0][0] выполняет print и выводит указанный текст на экран
   {
-  printf(" mimax = %d mjmax = %d mkmax = %d\n",MX0,MY0,MZ0);
+  printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
   }
+  
 
-  nn= 3;
-
-#pragma xmp task on t(0,0,0)
+  nn= 3;//3 итерации алгоритма Якоби
+  #pragma xmp task on t[0][0][0]
   {
   printf(" Start rehearsal measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
   }
 
-#pragma acc data copyin(p, bnd, wrk1, wrk2, a, b, c)
+  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
   {
-#pragma xmp reflect_init (p) width(1,1,0) acc
-#pragma xmp reflect_do (p) acc
-#pragma xmp barrier
-  cpu0= gettime();
+    #pragma xmp reflect_init (p) acc//директива reflect init выполняет процессы инициализации, а директива reflect do обновляет теневые области
+    #pragma xmp reflect_do (p) acc
+  cpu0= second();
   gosa= jacobi(nn);
-  cpu1= gettime();
-  cpu = cpu1 - cpu0;
-#pragma xmp reduction(max: cpu)
+  cpu1= second();
+  cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
+    #pragma xmp reduction(max: cpu)//вычисляет максимальное значение переменной cpu, хранящееся в памяти каждого ускорителя в каждом узле.
 
-  flop= fflop(mz,my,mx);
+  flop= fflop(imax,jmax,kmax);//флопсы
+  
+    #pragma xmp task on t[0][0][0]//узел p[0][0][0] выполняет print и выводит указанный текст на экран
+  printf(" MFLOPS: %f time(s): %f %e\n\n", mflops(nn,cpu,flop),cpu,gosa);
 
-#pragma xmp task on t(0,0,0)
-  printf(" MFLOPS: %f time(s): %f %e\n\n",
-	 mflops(nn,cpu,flop),cpu,gosa);
-
-  nn= (int)(target/(cpu/3.0));
-  nn= LOOP_TIMES;
-  reflect_time = 0.0;
-#pragma xmp task on t(0,0,0)
+  nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
+   
+    #pragma xmp task on t[0][0][0]
   {
   printf(" Now, start the actual measurement process.\n");
   printf(" The loop will be excuted in %d times\n",nn);
   printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
   }
-
   /*
    *    Start measuring
    */
+  cpu0 = second();
+  gosa = jacobi(nn);
+  cpu1 = second();
 
-#pragma xmp barrier
-  cpu0= gettime();
-  gosa= jacobi(nn);
-  cpu1= gettime();
-  cpu = cpu1 - cpu0;
-#pragma xmp reduction(max:cpu)
-  max_reflect_time = reflect_time;
-  ave_reflect_time = reflect_time;
-#pragma xmp reduction(max:max_reflect_time)
-#pragma xmp reduction(+:ave_reflect_time)
-#ifdef _XCALABLEMP
-  ave_reflect_time /= xmp_num_nodes();
-#endif
-  }//end of acc data
-
-#pragma xmp task on t(0,0,0)
+  cpu= cpu1 - cpu0;
+    #pragma xmp reduction(max:cpu)//вычисляет максимальное значение переменной cpu, хранящееся в памяти каждого ускорителя в каждом узле.
+  }
+  
+  #pragma xmp task on t(0,0,0)
   {
-  printf("Loop executed for %d times\n",nn);
-  printf("Gosa : %e \n",gosa);
-  printf("MFLOPS measured : %f\n",mflops(nn,cpu,flop));
-  printf("Score based on Pentium III 600MHz using Fortran 77: %f\n",
-	 mflops(nn,cpu,flop)/82.84);
+  printf(" Loop executed for %d times\n",nn);//количество итераций
+  printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
+  printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
+  printf(" Score based on Pentium III 600MHz : %f%d\n", mflops(nn,cpu,flop)/82,84);// оценка производительности
   }
 
   return (0);
 }
 
+void
+initmt()
+{
+	int i,j,k;
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+  for(i=0 ; i<MIMAX ; i++)
+    for(j=0 ; j<MJMAX ; j++)
+      for(k=0 ; k<MKMAX ; k++){
+        a[0][i][j][k]=0.0;
+        a[1][i][j][k]=0.0;
+        a[2][i][j][k]=0.0;
+        a[3][i][j][k]=0.0;
+        b[0][i][j][k]=0.0;
+        b[1][i][j][k]=0.0;
+        b[2][i][j][k]=0.0;
+        c[0][i][j][k]=0.0;
+        c[1][i][j][k]=0.0;
+        c[2][i][j][k]=0.0;
+        p[i][j][k]=0.0;
+        wrk1[i][j][k]=0.0;
+        bnd[i][j][k]=0.0;
+      }
+#pragma xmp loop [k][j][i] on t[k][j][i]//параллельное выполнение оператора цикла
+  for(i=0 ; i<imax ; i++)
+    for(j=0 ; j<jmax ; j++)
+      for(k=0 ; k<kmax ; k++){
+        a[0][i][j][k]=1.0;
+        a[1][i][j][k]=1.0;
+        a[2][i][j][k]=1.0;
+        a[3][i][j][k]=1.0/6.0;
+        b[0][i][j][k]=0.0;
+        b[1][i][j][k]=0.0;
+        b[2][i][j][k]=0.0;
+        c[0][i][j][k]=1.0;
+        c[1][i][j][k]=1.0;
+        c[2][i][j][k]=1.0;
+        p[i][j][k]=(float)(i*i)/(float)((imax-1)*(imax-1));
+        wrk1[i][j][k]=0.0;
+        bnd[i][j][k]=1.0;
+      }
+}
 
+float
+jacobi(int nn)
+{
+  int i,j,k,n;
+  float gosa, s0, ss;
 
+  for(n=0 ; n<nn ; ++n){
+    gosa = 0.0;
 
+    for(i=1 ; i<imax-1 ; i++)
+      for(j=1 ; j<jmax-1 ; j++)
+        for(k=1 ; k<kmax-1 ; k++){
+          s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
+             + a[1][i][j][k] * p[i  ][j+1][k  ]
+             + a[2][i][j][k] * p[i  ][j  ][k+1]
+             + b[0][i][j][k] * ( p[i+1][j+1][k  ] - p[i+1][j-1][k  ]
+                              - p[i-1][j+1][k  ] + p[i-1][j-1][k  ] )
+             + b[1][i][j][k] * ( p[i  ][j+1][k+1] - p[i  ][j-1][k+1]
+                               - p[i  ][j+1][k-1] + p[i  ][j-1][k-1] )
+             + b[2][i][j][k] * ( p[i+1][j  ][k+1] - p[i-1][j  ][k+1]
+                               - p[i+1][j  ][k-1] + p[i-1][j  ][k-1] )
+             + c[0][i][j][k] * p[i-1][j  ][k  ]
+             + c[1][i][j][k] * p[i  ][j-1][k  ]
+             + c[2][i][j][k] * p[i  ][j  ][k-1]
+             + wrk1[i][j][k];
 
+          ss = ( s0 * a[3][i][j][k] - p[i][j][k] ) * bnd[i][j][k];
 
+          gosa+= ss*ss;
+          /* gosa= (gosa > ss*ss) ? a : b; */
+
+          wrk2[i][j][k] = p[i][j][k] + omega * ss;
+        }
+
+    for(i=1 ; i<imax-1 ; ++i)
+      for(j=1 ; j<jmax-1 ; ++j)
+        for(k=1 ; k<kmax-1 ; ++k)
+          p[i][j][k] = wrk2[i][j][k];
+    
+  } /* end n loop */
+
+  return(gosa);
+}
 
 double
 fflop(int mx,int my, int mz)
@@ -212,124 +255,27 @@ mflops(int nn,double cpu,double flop)
   return(flop/cpu*1.e-6*(double)nn);
 }
 
-void
-initmt()
+double
+second()
 {
-  int i,j,k;
+#include <sys/time.h>
 
-#pragma xmp loop (k,j,i) on t(k,j,i)
-  for(i=0 ; i<MIMAX ; ++i)
-    for(j=0 ; j<MJMAX ; ++j)
-      for(k=0 ; k<MKMAX ; ++k){
-        a[0][i][j][k]=0.0;
-        a[1][i][j][k]=0.0;
-        a[2][i][j][k]=0.0;
-        a[3][i][j][k]=0.0;
-        b[0][i][j][k]=0.0;
-        b[1][i][j][k]=0.0;
-        b[2][i][j][k]=0.0;
-        c[0][i][j][k]=0.0;
-        c[1][i][j][k]=0.0;
-        c[2][i][j][k]=0.0;
-        p[i][j][k]=0.0;
-        wrk1[i][j][k]=0.0;
-        wrk2[i][j][k]=0.0;
-        bnd[i][j][k]=0.0;
-      }
+  struct timeval tm;
+  double t ;
 
-#pragma xmp loop (k,j,i) on t(k,j,i)
-  for(i=0 ; i<imax ; ++i)
-    for(j=0 ; j<jmax ; ++j)
-      for(k=0 ; k<kmax ; ++k){
-        a[0][i][j][k]=1.0;
-        a[1][i][j][k]=1.0;
-        a[2][i][j][k]=1.0;
-        a[3][i][j][k]=1.0/6.0;
-        b[0][i][j][k]=0.0;
-        b[1][i][j][k]=0.0;
-        b[2][i][j][k]=0.0;
-        c[0][i][j][k]=1.0;
-        c[1][i][j][k]=1.0;
-        c[2][i][j][k]=1.0;
-	p[i][j][k]=(float)((i)*(i))/(float)((imax-1)*(imax-1));
-        wrk1[i][j][k]=0.0;
-        wrk2[i][j][k]=0.0;
-        bnd[i][j][k]=1.0;
-      }
-}
+  static int base_sec = 0,base_usec = 0;
 
-float
-jacobi(int nn)
-{
-  int i,j,k,n;
-  float gosa,s0,ss;
+  gettimeofday(&tm, NULL);
+  
+  if(base_sec == 0 && base_usec == 0)
+    {
+      base_sec = tm.tv_sec;
+      base_usec = tm.tv_usec;
+      t = 0.0;
+  } else {
+    t = (double) (tm.tv_sec-base_sec) + 
+      ((double) (tm.tv_usec-base_usec))/1.0e6 ;
+  }
 
-#pragma acc data present(p, bnd, wrk1, wrk2, a, b, c) create(gosa)
-  for(n=0 ; n<nn ; ++n){
-    gosa = 0.0;
-#pragma acc update device(gosa)
-
-#pragma xmp loop (k,j,i) on t(k,j,i)
-#pragma acc parallel loop firstprivate(omega) reduction(+:gosa) collapse(2) gang vector_length(64) async
-    for(i=1 ; i<imax-1 ; ++i){
-      for(j=1 ; j<jmax-1 ; ++j){
-#pragma acc loop vector reduction(+:gosa) private(s0, ss)
-        for(k=1 ; k<kmax-1 ; ++k){
-          s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
-             + a[1][i][j][k] * p[i  ][j+1][k  ]
-             + a[2][i][j][k] * p[i  ][j  ][k+1]
-             + b[0][i][j][k] * ( p[i+1][j+1][k  ] - p[i+1][j-1][k  ]
-                               - p[i-1][j+1][k  ] + p[i-1][j-1][k  ] )
-             + b[1][i][j][k] * ( p[i  ][j+1][k+1] - p[i  ][j-1][k+1]
-                               - p[i  ][j+1][k-1] + p[i  ][j-1][k-1] )
-             + b[2][i][j][k] * ( p[i+1][j  ][k+1] - p[i-1][j  ][k+1]
-                               - p[i+1][j  ][k-1] + p[i-1][j  ][k-1] )
-             + c[0][i][j][k] * p[i-1][j  ][k  ]
-             + c[1][i][j][k] * p[i  ][j-1][k  ]
-             + c[2][i][j][k] * p[i  ][j  ][k-1]
-             + wrk1[i][j][k];
-          ss = ( s0 * a[3][i][j][k] - p[i][j][k] ) * bnd[i][j][k];
-          gosa += ss*ss;
-
-          wrk2[i][j][k] = p[i][j][k] + omega * ss;
-        }
-      }
-    }
-
-#pragma xmp loop (k,j,i) on t(k,j,i)
-#pragma acc parallel loop collapse(2) gang vector_length(64) async
-    for(i=1 ; i<imax-1 ; ++i){
-      for(j=1 ; j<jmax-1 ; ++j){
-#pragma acc loop vector
-        for(k=1 ; k<kmax-1 ; ++k){
-          p[i][j][k] = wrk2[i][j][k];
-        }
-      }
-    }
-
-#pragma acc wait
-#ifdef _XCALABLEMP
-    reflect_time0 = gettime();
-#endif
-#pragma xmp reflect_do (p) acc
-#ifdef _XCALABLEMP
-    reflect_time += gettime() - reflect_time0;
-#endif
-
-#pragma acc update host(gosa)
-#pragma xmp reduction(+:gosa)
-  } /* end n loop */
-
-  return(gosa);
-}
-
-double gettime()
-{
-#ifdef _XCALABLEMP
-  return xmp_wtime();
-#else
-  struct timeval tv;
-  gettimeofday(&tv,NULL);
-  return (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
-#endif
+  return t ;
 }

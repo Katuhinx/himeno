@@ -39,6 +39,7 @@
 #include <stdio.h>
 #define SSMALL
 #include "parametr.h"
+//#include "/home/katrin/omni-compiler/libxmp/xmp.h"
 
 
 
@@ -205,12 +206,20 @@ jacobi(int nn)
   int i,j,k,n;
   float gosa, s0, ss;
 
+#pragma acc data present(a, b, c,bnd, wrk1, wrk2,p) create(gosa) //данные присутствуют на графическом процессоре и какие действия мы с ними будем выполнять при входе и при выходе из секции
+//present - все переменные из списка уже существуют на графическом процессоре(память была выделена на 114 строке)
+// create - выделяем память на графическом процессоре для новой переменной gosa
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
+#pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обнавляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
 
-    for(i=1 ; i<imax-1 ; i++)
-      for(j=1 ; j<jmax-1 ; j++)
-        for(k=1 ; k<kmax-1 ; k++){
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+#pragma acc parallel loop reduction(+:gosa) collapse(2)//выполняется редукция над переменной gosa и все вложенные циклы превращаются в один
+
+    for(i=1 ; i<imax-1 ; i++){
+      for(j=1 ; j<jmax-1 ; j++){
+        for(k=1 ; k<kmax-1 ; k++)
+        #pragma acc loop vector{// сомневаюсь в правильности
           s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
              + a[1][i][j][k] * p[i  ][j+1][k  ]
              + a[2][i][j][k] * p[i  ][j  ][k+1]
@@ -232,14 +241,22 @@ jacobi(int nn)
 
           wrk2[i][j][k] = p[i][j][k] + omega * ss;
         }
+      }
+    }
 
-    for(i=1 ; i<imax-1 ; ++i)
-      for(j=1 ; j<jmax-1 ; ++j)
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+#pragma acc parallel loop collapse(2) //2 вложенных цикла будут выполняться какодин
+    for(i=1 ; i<imax-1 ; ++i){
+      for(j=1 ; j<jmax-1 ; ++j){
         for(k=1 ; k<kmax-1 ; ++k)
-          p[i][j][k] = wrk2[i][j][k];
-    
-  } /* end n loop */
-
+        #pragma acc loop vector//  сомневаюсь в этом моменте
+          {p[i][j][k] = wrk2[i][j][k];}
+      }
+    } 
+  
+  #pragma acc update host(gosa)//обновить значение в памяти ЦП из памяти графического
+  /* end n loop */
+  }
   return(gosa);
 }
 

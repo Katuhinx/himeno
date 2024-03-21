@@ -120,7 +120,7 @@ main()
   {
     #pragma xmp reflect_init (p) acc//директива reflect init выполняет процессы инициализации, а директива reflect do обновляет теневые области
     #pragma xmp reflect_do (p) acc
-    #pragma xmp barrier
+  
   cpu0= second();
   gosa= jacobi(nn);
   cpu1= second();
@@ -144,7 +144,7 @@ main()
   /*
    *    Start measuring
    */
-  #pragma xmp barrier
+ 
   cpu0 = second();
   gosa = jacobi(nn);
   cpu1 = second();
@@ -220,7 +220,7 @@ jacobi(int nn)
 #pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обнавляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
 
 #pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
-#pragma acc parallel loop reduction(+:gosa) collapse(2)gang vector_length(64) async//выполняется редукция над переменной gosa и все вложенные циклы превращаются в один
+#pragma acc parallel loop reduction(+:gosa) collapse(2)//выполняется редукция над переменной gosa и все вложенные циклы превращаются в один
 
     for(i=1 ; i<imax-1 ; i++){
       for(j=1 ; j<jmax-1 ; j++){
@@ -252,7 +252,7 @@ jacobi(int nn)
     }
 
 #pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
-#pragma acc parallel loop collapse(2) gang vector_length(64) async//2 вложенных цикла будут выполняться какодин
+#pragma acc parallel loop collapse(2) //2 вложенных цикла будут выполняться какодин
     for(i=1 ; i<imax-1 ; ++i){
       for(j=1 ; j<jmax-1 ; ++j){
          #pragma acc loop vector// указывает, что итерации цикла исполняются в векторном режиме

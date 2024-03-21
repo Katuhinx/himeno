@@ -37,10 +37,11 @@
 ********************************************************************/
 
 #include <stdio.h>
+#include <sys/time.h>
 #define XSMALL
 #include "parametr.h"
-
-
+//#include <xmp.h>
+//#include "/home/katrin/omni-compiler/libxmp/xmp.h"
 
 double second();
 float jacobi();
@@ -59,6 +60,26 @@ static float  wrk1[MIMAX][MJMAX][MKMAX],
 static int imax, jmax, kmax;
 static float omega;
 
+
+#pragma xmp template t[0:MKMAX-1] [0:MJMAX-1] [0:MIMAX-1]//шаблон для матрицы
+#pragma xmp nodes n [2][1][1]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
+#pragma xmp distribute t[block] [block] [block] onto n// распределяем массив t между набором узлов n
+#pragma xmp align p[k][j][i] with t[i][j][k]//выравниваем массив p по шаблону t
+#pragma xmp align bnd[k][j][i] with t[i][j][k]
+#pragma xmp align wrk1[k][j][i] with t[i][j][k]
+#pragma xmp align wrk2[k][j][i] with t[i][j][k]
+#pragma xmp align a[*][k][j][i] with t[i][j][k]
+#pragma xmp align b[*][k][j][i] with t[i][j][k]
+#pragma xmp align c[*][k][j][i] with t[i][j][k]
+#pragma xmp shadow p[1][1][1]// определяем теневые грани следующих массивов
+#pragma xmp shadow bnd[1][1][1]
+#pragma xmp shadow wrk1[1][1][1]
+#pragma xmp shadow wrk2[1][1][1]
+#pragma xmp shadow a[0][1][1][1]
+#pragma xmp shadow b[0][1][1][1]
+#pragma xmp shadow c[0][1][1][1]
+
+
 int
 main()
 {
@@ -75,31 +96,44 @@ main()
   /*
    *    Initializing matrixes
    */
-  initmt();
+  initmt();// инициализация матрицы
+
+  #pragma xmp task on t[0][0][0]//узел p[0][0][0] выполняет print и выводит указанный текст на экран
+  {
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
+  }
+  
 
   nn= 3;//3 итерации алгоритма Якоби
+  #pragma xmp task on t[0][0][0]
+  {
   printf(" Start rehearsal measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
+  }
 
+   {
+    #pragma xmp reflect (p)
   cpu0= second();
   gosa= jacobi(nn);
   cpu1= second();
   cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
+    #pragma xmp reduction(max: cpu)//вычисляет максимальное значение переменной cpu, хранящееся в памяти каждого ускорителя в каждом узле.
 
   flop= fflop(imax,jmax,kmax);//флопсы
   
-  printf(" MFLOPS: %f time(s): %f %e\n\n",
-         mflops(nn,cpu,flop),cpu,gosa);
+    #pragma xmp task on t[0][0][0]//узел p[0][0][0] выполняет print и выводит указанный текст на экран
+  printf(" MFLOPS: %f time(s): %f %e\n\n", mflops(nn,cpu,flop),cpu,gosa);
 
   nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
-
+   
+    #pragma xmp task on t[0][0][0]
+  {
   printf(" Now, start the actual measurement process.\n");
   printf(" The loop will be excuted in %d times\n",nn);
   printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
-
+  }
   /*
    *    Start measuring
    */
@@ -108,13 +142,17 @@ main()
   cpu1 = second();
 
   cpu= cpu1 - cpu0;
+    #pragma xmp reduction(max:cpu)//вычисляет максимальное значение переменной cpu, хранящееся в памяти каждого ускорителя в каждом узле.
+  }
   
+  #pragma xmp task on t(0,0,0)
+  {
   printf(" Loop executed for %d times\n",nn);//количество итераций
   printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
   printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
-  printf(" Score based on Pentium III 600MHz : %f%d\n",
-         mflops(nn,cpu,flop)/82,84);// оценка производительности
-  
+  printf(" Score based on Pentium III 600MHz : %f%d\n", mflops(nn,cpu,flop)/82,84);// оценка производительности
+  }
+
   return (0);
 }
 
@@ -122,7 +160,7 @@ void
 initmt()
 {
 	int i,j,k;
-
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
       for(k=0 ; k<MKMAX ; k++){
@@ -140,7 +178,7 @@ initmt()
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=0.0;
       }
-
+#pragma xmp loop [k][j][i] on t[k][j][i]//параллельное выполнение оператора цикла
   for(i=0 ; i<imax ; i++)
     for(j=0 ; j<jmax ; j++)
       for(k=0 ; k<kmax ; k++){
@@ -169,9 +207,12 @@ jacobi(int nn)
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
 
-    for(i=1 ; i<imax-1 ; i++)
-      for(j=1 ; j<jmax-1 ; j++)
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+
+    for(i=1 ; i<imax-1 ; i++){
+      for(j=1 ; j<jmax-1 ; j++){
         for(k=1 ; k<kmax-1 ; k++){
+        
           s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
              + a[1][i][j][k] * p[i  ][j+1][k  ]
              + a[2][i][j][k] * p[i  ][j  ][k+1]
@@ -193,13 +234,21 @@ jacobi(int nn)
 
           wrk2[i][j][k] = p[i][j][k] + omega * ss;
         }
+      }
+    }
 
-    for(i=1 ; i<imax-1 ; ++i)
-      for(j=1 ; j<jmax-1 ; ++j)
-        for(k=1 ; k<kmax-1 ; ++k)
-          p[i][j][k] = wrk2[i][j][k];
-    
-  } /* end n loop */
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+   for(i=1 ; i<imax-1 ; ++i){
+      for(j=1 ; j<jmax-1 ; ++j){
+             for(k=1 ; k<kmax-1 ; ++k)
+              {p[i][j][k] = wrk2[i][j][k];}
+      }
+    } 
+  
+  /* end n loop */
+  #pragma xmp reflect(p) 
+  #pragma xmp reduction(+:gosa)
+  }
 
   return(gosa);
 }

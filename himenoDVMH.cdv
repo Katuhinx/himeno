@@ -43,18 +43,32 @@
 
 
 double second();
-float jacobi();
+float jacobi(int);
 void initmt();
 double fflop(int,int,int);
 double mflops(int,double,double);
 
-static float  p[MIMAX][MJMAX][MKMAX];
-static float  a[4][MIMAX][MJMAX][MKMAX],
-              b[3][MIMAX][MJMAX][MKMAX],
-              c[3][MIMAX][MJMAX][MKMAX];
+# pragma dvm array distribute [ block ][ block ][ block ] 
 static float  bnd[MIMAX][MJMAX][MKMAX];
-static float  wrk1[MIMAX][MJMAX][MKMAX],
-              wrk2[MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([] [ i ][ j ] [ k ] with bnd [ i ][ j ][ k ]) 
+static float  a[4][MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([] [ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])
+static float b[3][MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([] [ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])
+static float c[3][MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ]) 
+static float  p[MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])
+static float  wrk1[MIMAX][MJMAX][MKMAX];
+
+# pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])
+static float  wrk2[MIMAX][MJMAX][MKMAX];
+
 
 static int imax, jmax, kmax;
 static float omega;
@@ -110,6 +124,7 @@ main()
   cpu= cpu1 - cpu0;
   
   printf(" Loop executed for %d times\n",nn);//количество итераций
+ #pragma dvm get_actual ( gosa )
   printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
   printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
   printf(" Score based on Pentium III 600MHz : %f%d\n",
@@ -122,7 +137,9 @@ void
 initmt()
 {
 	int i,j,k;
-
+   // #pragma dvm region
+   // {
+   #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ])
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
       for(k=0 ; k<MKMAX ; k++){
@@ -139,8 +156,11 @@ initmt()
         p[i][j][k]=0.0;
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=0.0;
-      }
-
+     // }
+    }
+   //  #pragma dvm region
+  //  {
+   #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ])
   for(i=0 ; i<imax ; i++)
     for(j=0 ; j<jmax ; j++)
       for(k=0 ; k<kmax ; k++){
@@ -157,7 +177,8 @@ initmt()
         p[i][j][k]=(float)(i*i)/(float)((imax-1)*(imax-1));
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=1.0;
-      }
+     // }
+    }
 }
 
 float
@@ -168,7 +189,10 @@ jacobi(int nn)
 
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
-
+#pragma dvm actual ( gosa )
+#pragma dvm region
+{
+ #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ]) shadow_renew(p(corner)) reduction ( sum ( gosa ) ) private(s0, ss)
     for(i=1 ; i<imax-1 ; i++)
       for(j=1 ; j<jmax-1 ; j++)
         for(k=1 ; k<kmax-1 ; k++){
@@ -193,14 +217,17 @@ jacobi(int nn)
 
           wrk2[i][j][k] = p[i][j][k] + omega * ss;
         }
-
+ #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ])
     for(i=1 ; i<imax-1 ; ++i)
       for(j=1 ; j<jmax-1 ; ++j)
         for(k=1 ; k<kmax-1 ; ++k)
           p[i][j][k] = wrk2[i][j][k];
     
-  } /* end n loop */
+  /* end n loop */
+}
+}
 
+#pragma dvm actual ( gosa )
   return(gosa);
 }
 

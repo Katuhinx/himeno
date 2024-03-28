@@ -60,7 +60,7 @@ static float b[3][MIMAX][MJMAX][MKMAX];
 # pragma dvm array align ([] [ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])
 static float c[3][MIMAX][MJMAX][MKMAX];
 
-# pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ]) 
+# pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ]) ,shadow [1][1][1]
 static float  p[MIMAX][MJMAX][MKMAX];
 
 # pragma dvm array align ([ i ][ j ] [ k ] with bnd [ i ][ j ][ k ])

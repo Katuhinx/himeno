@@ -83,17 +83,16 @@ main()
    */
   initmt();// инициализация матрицы
 
-  {
+  
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
-  }
   
 
   nn= 3;//3 итерации алгоритма Якоби
-  {
+  
   printf(" Start rehearsal measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
-  }
+  
 
   #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
   {
@@ -138,6 +137,8 @@ void
 initmt()
 {
 	int i,j,k;
+  #pragma acc kernels
+  {
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
       for(k=0 ; k<MKMAX ; k++){
@@ -172,6 +173,7 @@ initmt()
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=1.0;
       }
+  }
 }
 
 float
@@ -179,7 +181,8 @@ jacobi(int nn)
 {
   int i,j,k,n;
   float gosa, s0, ss;
-
+#pragma acc kernels
+ {
 #pragma acc data present(a, b, c,bnd, wrk1, wrk2,p) create(gosa) //данные присутствуют на графическом процессоре и какие действия мы с ними будем выполнять при входе и при выходе из секции
 //present - все переменные из списка уже существуют на графическом процессоре(память была выделена на 114 строке)
 // create - выделяем память на графическом процессоре для новой переменной gosa
@@ -230,7 +233,7 @@ jacobi(int nn)
   #pragma acc update host(gosa)//обновить значение в памяти ЦП из памяти графического
   /* end n loop */
    }
-
+ }
   return(gosa);
 }
 

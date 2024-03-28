@@ -43,15 +43,11 @@
 //#include <xmp.h>
 //#include "/home/katrin/omni-compiler/libxmp/xmp.h"
 
-
-
-
 double second();
 float jacobi();
 void initmt();
 double fflop(int,int,int);
 double mflops(int,double,double);
-
 
 static float  p[MIMAX][MJMAX][MKMAX];
 static float  a[4][MIMAX][MJMAX][MKMAX],
@@ -65,9 +61,9 @@ static int imax, jmax, kmax;
 static float omega;
 
 
-#pragma xmp template t[0:MKMAX-1] [0:MJMAX-1] [0:MIMAX-1]//шаблон для матрицы
+#pragma xmp template t[MKMAX][MJMAX][MIMAX]//шаблон для матрицы
 #pragma xmp nodes n [2][1][1]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
-#pragma xmp distribute t[block] [block] [block] onto n// распределяем массив t между набором узлов n
+#pragma xmp distribute t[block][block][block] onto n// распределяем массив t между набором узлов n
 #pragma xmp align p[k][j][i] with t[i][j][k]//выравниваем массив p по шаблону t
 #pragma xmp align bnd[k][j][i] with t[i][j][k]
 #pragma xmp align wrk1[k][j][i] with t[i][j][k]
@@ -115,12 +111,9 @@ main()
   printf(" Start rehearsal measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
   }
-
   #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
   {
-    #pragma xmp reflect_init (p) acc//директива reflect init выполняет процессы инициализации, а директива reflect do обновляет теневые области
-    #pragma xmp reflect_do (p) acc
-  
+   #pragma xmp reflect (p)
   cpu0= second();
   gosa= jacobi(nn);
   cpu1= second();
@@ -144,7 +137,6 @@ main()
   /*
    *    Start measuring
    */
- 
   cpu0 = second();
   gosa = jacobi(nn);
   cpu1 = second();
@@ -168,6 +160,7 @@ void
 initmt()
 {
 	int i,j,k;
+ 
 #pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
@@ -204,6 +197,7 @@ initmt()
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=1.0;
       }
+  
 }
 
 float
@@ -211,10 +205,12 @@ jacobi(int nn)
 {
   int i,j,k,n;
   float gosa, s0, ss;
-
-#pragma acc data present(a, b, c, bnd, wrk1, wrk2, p) create(gosa) //данные присутствуют на графическом процессоре и какие действия мы с ними будем выполнять при входе и при выходе из секции
+  
+#pragma acc data present(a, b, c,bnd, wrk1, wrk2,p) create(gosa) //данные присутствуют на графическом процессоре и какие действия мы с ними будем выполнять при входе и при выходе из секции
 //present - все переменные из списка уже существуют на графическом процессоре(память была выделена на 114 строке)
 // create - выделяем память на графическом процессоре для новой переменной gosa
+ 
+
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
 #pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обнавляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
@@ -224,7 +220,7 @@ jacobi(int nn)
 
     for(i=1 ; i<imax-1 ; i++){
       for(j=1 ; j<jmax-1 ; j++){
-      #pragma acc loop reduction(+:gosa) vector// указывает, что итерации цикла исполняются в векторном режиме
+        #pragma acc loop reduction(+:gosa) vector// указывает, что итерации цикла исполняются в векторном режиме
         for(k=1 ; k<kmax-1 ; k++){
         
           s0 = a[0][i][j][k] * p[i+1][j  ][k  ]
@@ -234,8 +230,8 @@ jacobi(int nn)
                               - p[i-1][j+1][k  ] + p[i-1][j-1][k  ] )
              + b[1][i][j][k] * ( p[i  ][j+1][k+1] - p[i  ][j-1][k+1]
                                - p[i  ][j+1][k-1] + p[i  ][j-1][k-1] )
-             + b[2][i][j][k] * ( p[i+1][j][k+1] - p[i-1][j][k+1]
-                               - p[i+1][j][k-1] + p[i-1][j][k-1] )
+             + b[2][i][j][k] * ( p[i+1][j  ][k+1] - p[i-1][j  ][k+1]
+                               - p[i+1][j  ][k-1] + p[i-1][j  ][k-1] )
              + c[0][i][j][k] * p[i-1][j  ][k  ]
              + c[1][i][j][k] * p[i  ][j-1][k  ]
              + c[2][i][j][k] * p[i  ][j  ][k-1]
@@ -250,21 +246,23 @@ jacobi(int nn)
         }
       }
     }
-
-#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
 #pragma acc parallel loop collapse(2) //2 вложенных цикла будут выполняться какодин
-    for(i=1 ; i<imax-1 ; ++i){
+#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+   for(i=1 ; i<imax-1 ; ++i){
       for(j=1 ; j<jmax-1 ; ++j){
          #pragma acc loop vector// указывает, что итерации цикла исполняются в векторном режиме
-              for(k=1 ; k<kmax-1 ; ++k)
+           for(k=1 ; k<kmax-1 ; ++k)
               {p[i][j][k] = wrk2[i][j][k];}
       }
     } 
-  #pragma xmp reflect_do (p) acc//обновляет теневые грани
-  #pragma acc update host(gosa)//обновить значение в памяти ЦП из памяти графического
+  
   /* end n loop */
+  #pragma acc update host(gosa)//обновить значение в памяти ЦП из памяти графического
+ 
+  #pragma xmp reflect(p) 
   #pragma xmp reduction(+:gosa)
   }
+ 
 
   return(gosa);
 }
@@ -284,24 +282,7 @@ mflops(int nn,double cpu,double flop)
 double
 second()
 {
-#include <sys/time.h>
-
-  struct timeval tm;
-  double t ;
-
-  static int base_sec = 0,base_usec = 0;
-
-  gettimeofday(&tm, NULL);
-  
-  if(base_sec == 0 && base_usec == 0)
-    {
-      base_sec = tm.tv_sec;
-      base_usec = tm.tv_usec;
-      t = 0.0;
-  } else {
-    t = (double) (tm.tv_sec-base_sec) + 
-      ((double) (tm.tv_usec-base_usec))/1.0e6 ;
-  }
-
-  return t ;
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  return (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
 }

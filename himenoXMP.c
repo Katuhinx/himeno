@@ -61,9 +61,9 @@ static int imax, jmax, kmax;
 static float omega;
 
 
-#pragma xmp template t[0:MKMAX-1] [0:MJMAX-1] [0:MIMAX-1]//шаблон для матрицы
+#pragma xmp template t[MKMAX][MJMAX][MIMAX]//шаблон для матрицы
 #pragma xmp nodes n [2][1][1]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
-#pragma xmp distribute t[block] [block] [block] onto n// распределяем массив t между набором узлов n
+#pragma xmp distribute t[block][block][block] onto n// распределяем массив t между набором узлов n
 #pragma xmp align p[k][j][i] with t[i][j][k]//выравниваем массив p по шаблону t
 #pragma xmp align bnd[k][j][i] with t[i][j][k]
 #pragma xmp align wrk1[k][j][i] with t[i][j][k]
@@ -72,12 +72,12 @@ static float omega;
 #pragma xmp align b[*][k][j][i] with t[i][j][k]
 #pragma xmp align c[*][k][j][i] with t[i][j][k]
 #pragma xmp shadow p[1][1][1]// определяем теневые грани следующих массивов
-#pragma xmp shadow bnd[1][1][1]
-#pragma xmp shadow wrk1[1][1][1]
-#pragma xmp shadow wrk2[1][1][1]
-#pragma xmp shadow a[0][1][1][1]
-#pragma xmp shadow b[0][1][1][1]
-#pragma xmp shadow c[0][1][1][1]
+//#pragma xmp shadow bnd[1][1][1]
+//#pragma xmp shadow wrk1[1][1][1]
+//#pragma xmp shadow wrk2[1][1][1]
+//#pragma xmp shadow a[0][1][1][1]
+//#pragma xmp shadow b[0][1][1][1]
+//#pragma xmp shadow c[0][1][1][1]
 
 
 int
@@ -268,24 +268,7 @@ mflops(int nn,double cpu,double flop)
 double
 second()
 {
-#include <sys/time.h>
-
-  struct timeval tm;
-  double t ;
-
-  static int base_sec = 0,base_usec = 0;
-
-  gettimeofday(&tm, NULL);
-  
-  if(base_sec == 0 && base_usec == 0)
-    {
-      base_sec = tm.tv_sec;
-      base_usec = tm.tv_usec;
-      t = 0.0;
-  } else {
-    t = (double) (tm.tv_sec-base_sec) + 
-      ((double) (tm.tv_usec-base_usec))/1.0e6 ;
-  }
-
-  return t ;
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  return (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
 }

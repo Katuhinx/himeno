@@ -1,0 +1,26 @@
+#!/bin/sh
+
+dvmdir='/home/katrin/dvm/dvm_sys'
+export dvmbuild='Version 5.0, revision 8512, platform katrin-Virtual-Machine, build 1'
+
+#--------------- One can customize compiler options:
+# export PCC='cc -g -O2 -fopenmp' # C compiler
+# export PCXX='c++ -g -O2 -fopenmp' # C++ compiler
+# export PFORT='f95 -g -O2 -fopenmp' # Fortran compiler
+
+#--------------- One can add libraries (additional linker flags):
+# export USER_LIBS=''
+
+#--------------- One can set launch options:
+# export dvmwait=0 # Wait for task completion
+# export DVMH_STACKSIZE='' # Stack size to set for the task
+# export DVMH_NUM_THREADS='' # Number of CPU threads per process
+
+#--------------- Debugging options:
+# export DVMH_LOGLEVEL=1 # Levels of debugging: 1 - errors only, 2 - warning, 3 - info, 4 - debug, 5 - trace
+# export DVMH_LOGFILE='dvmh_%d.log' # Log file name for each process
+# export DVMH_COMPARE_DEBUG=0 # An alternative way to turn comparative debugging mode on
+# export dvmsave=0 # Save convertation results
+# export dvmshow=0 # Show commands executed by the DVM driver
+
+exec "$dvmdir/bin/dvm_drv" "$@"

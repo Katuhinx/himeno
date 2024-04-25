@@ -37,7 +37,7 @@
 ********************************************************************/
 
 #include <stdio.h>
-#define XSMALL
+#define MIDDLE
 #include "parametr.h"
 
 
@@ -93,25 +93,9 @@ main()
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
 
-  nn= 3;//3 итерации алгоритма Якоби
-  printf(" Start rehearsal measurement process.\n");
+  nn= 1000;//100 итерации алгоритма Якоби
+  printf(" Start  measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
-
-  cpu0= second();
-  gosa= jacobi(nn);
-  cpu1= second();
-  cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
-
-  flop= fflop(imax,jmax,kmax);//флопсы
-  
-  printf(" MFLOPS: %f time(s): %f %e\n\n",
-         mflops(nn,cpu,flop),cpu,gosa);
-
-  nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
-
-  printf(" Now, start the actual measurement process.\n");
-  printf(" The loop will be excuted in %d times\n",nn);
-  printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
 
   /*
@@ -122,7 +106,7 @@ main()
   cpu1 = second();
 
   cpu= cpu1 - cpu0;
-  
+  flop= fflop(imax,jmax,kmax);//флопсы
   printf(" Loop executed for %d times\n",nn);//количество итераций
  #pragma dvm get_actual ( gosa )
   printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
@@ -137,8 +121,8 @@ void
 initmt()
 {
 	int i,j,k;
-   // #pragma dvm region
-   // {
+    #pragma dvm region
+    {
    #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ])
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
@@ -156,7 +140,7 @@ initmt()
         p[i][j][k]=0.0;
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=0.0;
-     // }
+     //}
     }
    //  #pragma dvm region
   //  {
@@ -177,7 +161,7 @@ initmt()
         p[i][j][k]=(float)(i*i)/(float)((imax-1)*(imax-1));
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=1.0;
-     // }
+      }
     }
 }
 

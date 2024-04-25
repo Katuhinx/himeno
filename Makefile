@@ -13,5 +13,8 @@ compile_xmp:
 compile_xacc:
 	xmpcc -xacc -o himenoXACC himenoXACC.c
 
+compile_dvmh:
+	./dvm c himenoDVMH
+
 
 

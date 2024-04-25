@@ -37,7 +37,7 @@
 ********************************************************************/
 
 #include <stdio.h>
-#define XSMALL
+#define MIDDLE
 #include "parametr.h"
 
 
@@ -79,25 +79,9 @@ main()
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
 
-  nn= 3;//3 итерации алгоритма Якоби
-  printf(" Start rehearsal measurement process.\n");
+  nn= 100;//100 итерации алгоритма Якоби
+  printf(" Start measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
-
-  cpu0= second();
-  gosa= jacobi(nn);
-  cpu1= second();
-  cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
-
-  flop= fflop(imax,jmax,kmax);//флопсы
-  
-  printf(" MFLOPS: %f time(s): %f %e\n\n",
-         mflops(nn,cpu,flop),cpu,gosa);
-
-  nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
-
-  printf(" Now, start the actual measurement process.\n");
-  printf(" The loop will be excuted in %d times\n",nn);
-  printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
 
   /*
@@ -108,7 +92,7 @@ main()
   cpu1 = second();
 
   cpu= cpu1 - cpu0;
-  
+  flop= fflop(imax,jmax,kmax);//флопсы
   printf(" Loop executed for %d times\n",nn);//количество итераций
   printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
   printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);

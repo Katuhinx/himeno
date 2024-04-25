@@ -38,7 +38,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
-#define XSMALL
+#define MIDDLE
 #include "parametr.h"
 //#include <xmp.h>
 //#include "/home/katrin/omni-compiler/libxmp/xmp.h"
@@ -51,7 +51,7 @@ void initmt();
 double fflop(int,int,int);
 double mflops(int,double,double);
 
-static float  p[MIMAX][MJMAX][MKMAX];
+float  p[MIMAX][MJMAX][MKMAX];
 static float  a[4][MIMAX][MJMAX][MKMAX],
               b[3][MIMAX][MJMAX][MKMAX],
               c[3][MIMAX][MJMAX][MKMAX];
@@ -88,31 +88,12 @@ main()
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
   
 
-  nn= 3;//3 итерации алгоритма Якоби
-  
-  printf(" Start rehearsal measurement process.\n");
+  nn= 1000;//100 итерации алгоритма Якоби
+  printf(" Start measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
-  
-
-  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
-  {
-  cpu0= second();
-  gosa= jacobi(nn);
-  cpu1= second();
-  cpu= cpu1 - cpu0; //время выполнения 3 итераций алгоритма Якоби
-  
-  flop= fflop(imax,jmax,kmax);//флопсы
-  
-   printf(" MFLOPS: %f time(s): %f %e\n\n", mflops(nn,cpu,flop),cpu,gosa);
-
-  nn= (int)(target/(cpu/3.0));//общее количество итераций, которое можно выполнить за минуту
-   
-    {
-  printf(" Now, start the actual measurement process.\n");
-  printf(" The loop will be excuted in %d times\n",nn);
-  printf(" This will take about one minute.\n");
   printf(" Wait for a while\n\n");
-  }
+  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
+  
   /*
    *    Start measuring
    */
@@ -121,15 +102,15 @@ main()
   cpu1 = second();
 
   cpu= cpu1 - cpu0;
-   }
+  flop= fflop(imax,jmax,kmax);//флопсы
   
   {
   printf(" Loop executed for %d times\n",nn);//количество итераций
   printf(" Gosa : %e \n",gosa);//результат выполнения Якоби
-  printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
+  printf(" MFLOPS measured : %f.\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
   printf(" Score based on Pentium III 600MHz : %f%d\n", mflops(nn,cpu,flop)/82,84);// оценка производительности
+  
   }
-
   return (0);
 }
 
@@ -137,9 +118,7 @@ void
 initmt()
 {
 	int i,j,k;
-  #pragma acc kernels
-  {
-  for(i=0 ; i<MIMAX ; i++)
+   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
       for(k=0 ; k<MKMAX ; k++){
         a[0][i][j][k]=0.0;
@@ -173,7 +152,7 @@ initmt()
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=1.0;
       }
-  }
+  
 }
 
 float
@@ -181,14 +160,15 @@ jacobi(int nn)
 {
   int i,j,k,n;
   float gosa, s0, ss;
-#pragma acc kernels
- {
+
+
 #pragma acc data present(a, b, c,bnd, wrk1, wrk2,p) create(gosa) //данные присутствуют на графическом процессоре и какие действия мы с ними будем выполнять при входе и при выходе из секции
 //present - все переменные из списка уже существуют на графическом процессоре(память была выделена на 114 строке)
 // create - выделяем память на графическом процессоре для новой переменной gosa
-  for(n=0 ; n<nn ; ++n){
+{
+    for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
-#pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обнавляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
+#pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обновляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
 
 #pragma acc parallel loop reduction(+:gosa) collapse(2)//выполняется редукция над переменной gosa и все вложенные циклы превращаются в один
 
@@ -234,8 +214,11 @@ jacobi(int nn)
   /* end n loop */
    }
  }
+
+
   return(gosa);
 }
+
 
 
 double

@@ -72,12 +72,7 @@ static float omega;
 #pragma xmp align b[*] [i][j][k]with t[i][j][k]
 #pragma xmp align c[*] [i][j][k]with t[i][j][k]
 #pragma xmp shadow p[1][1][1]// определяем теневые грани следующих массивов
-//#pragma xmp shadow bnd[1][1][1]
-//#pragma xmp shadow wrk1[1][1][1]
-//#pragma xmp shadow wrk2[1][1][1]
-//#pragma xmp shadow a[0][1][1][1]
-//#pragma xmp shadow b[0][1][1][1]
-//#pragma xmp shadow c[0][1][1][1]
+
 
 
 int
@@ -105,7 +100,7 @@ main()
   }
   
 
-  nn= 100;//100 итерации алгоритма Якоби
+  nn= 1000;//100 итерации алгоритма Якоби
   #pragma xmp task on t[0][0][0]
   {
   printf(" Start  measurement process.\n");
@@ -138,7 +133,7 @@ void
 initmt()
 {
 	int i,j,k;
-#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+#pragma xmp loop [i][j][k] on t[i][j][k] //параллельное выполнение оператора цикла
   for(i=0 ; i<MIMAX ; i++)
     for(j=0 ; j<MJMAX ; j++)
       for(k=0 ; k<MKMAX ; k++){
@@ -156,7 +151,7 @@ initmt()
         wrk1[i][j][k]=0.0;
         bnd[i][j][k]=0.0;
       }
-#pragma xmp loop [k][j][i] on t[k][j][i]//параллельное выполнение оператора цикла
+#pragma xmp loop [i][j][k] on t[i][j][k]//параллельное выполнение оператора цикла
   for(i=0 ; i<imax ; i++)
     for(j=0 ; j<jmax ; j++)
       for(k=0 ; k<kmax ; k++){
@@ -185,7 +180,7 @@ jacobi(int nn)
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
 
-#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+#pragma xmp loop [i][j][k] on t[i][j][k] //параллельное выполнение оператора цикла
 
     for(i=1 ; i<imax-1 ; i++){
       for(j=1 ; j<jmax-1 ; j++){
@@ -215,7 +210,7 @@ jacobi(int nn)
       }
     }
 
-#pragma xmp loop [k][j][i] on t[k][j][i] //параллельное выполнение оператора цикла
+#pragma xmp loop [i][j][k] on t[i][j][k] //параллельное выполнение оператора цикла
    for(i=1 ; i<imax-1 ; ++i){
       for(j=1 ; j<jmax-1 ; ++j){
              for(k=1 ; k<kmax-1 ; ++k)

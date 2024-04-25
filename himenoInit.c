@@ -79,7 +79,7 @@ main()
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
 
-  nn= 100;//100 итерации алгоритма Якоби
+  nn= 1000;//100 итерации алгоритма Якоби
   printf(" Start measurement process.\n");
   printf(" Measure the performance in %d times.\n\n",nn);
   printf(" Wait for a while\n\n");

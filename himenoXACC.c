@@ -62,7 +62,7 @@ static float omega;
 
 
 #pragma xmp template t[MIMAX][MJMAX][MKMAX]//шаблон для матрицы
-#pragma xmp nodes n [1][1][2]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
+#pragma xmp nodes n [1][2][3]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
 #pragma xmp distribute t[block][block][block] onto n// распределяем массив t между набором узлов n
 #pragma xmp align p [i][j][k] with t[i][j][k]//выравниваем массив p по шаблону t
 #pragma xmp align bnd [i][j][k] with t[i][j][k]
@@ -114,8 +114,8 @@ main()
   /*
    *    Start measuring
    */
- // #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
- 
+  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
+ {
   cpu0 = second();
   gosa = jacobi(nn);
   cpu1 = second();
@@ -131,7 +131,7 @@ main()
   printf(" MFLOPS measured : %f\tcpu : %f\n",mflops(nn,cpu,flop),cpu);
   printf(" Score based on Pentium III 600MHz : %f%d\n", mflops(nn,cpu,flop)/82,84);// оценка производительности
   }
-
+ }
   return (0);
 }
 
@@ -187,7 +187,7 @@ jacobi(int nn)
   int i,j,k,n;
   float gosa, s0, ss;
   //#pragma acc create(gosa)
-   #pragma acc data copy(p, bnd, wrk1, wrk2, a, b, c) create(gosa)
+   #pragma acc data present(p, bnd, wrk1, wrk2, a, b, c) create(gosa)
  // #pragma acc data present(a, b, c,bnd, wrk1, wrk2,p) create(gosa)//передает распределенные массивы из памяти хоста в мапять ускорителя
  // create - выделяем память на графическом процессоре для новой переменной gosa
  {

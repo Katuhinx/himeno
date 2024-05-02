@@ -69,7 +69,7 @@ int
 main()
 {
   int    i,j,k,nn;
-  float  gosa;
+  double  gosa;
   double cpu,cpu0,cpu1,flop,target;
 
   target= 60.0;

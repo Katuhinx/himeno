@@ -176,7 +176,8 @@ jacobi(int nn)
 #pragma dvm actual ( gosa )
 #pragma dvm region
 {
- #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ]) shadow_renew(p(corner)) reduction ( sum ( gosa ) ) private(s0, ss)
+ #pragma dvm parallel ([ i ][ j ] [ k ] on p [ i ][ j ][ k ]) shadow_renew(p(corner))
+   reduction ( sum ( gosa ) ) private(s0, ss)
     for(i=1 ; i<imax-1 ; i++)
       for(j=1 ; j<jmax-1 ; j++)
         for(k=1 ; k<kmax-1 ; k++){

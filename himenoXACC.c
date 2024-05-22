@@ -62,7 +62,7 @@ static float omega;
 
 
 #pragma xmp template t[MIMAX][MJMAX][MKMAX]//шаблон для матрицы
-#pragma xmp nodes n [1][1][1]// выделяем 8 узлов  --p[0][0][0], p[1][0][0], p[0][1][0], p[0][0][1],p[1][1][0],p[0][1][1],p[1][0[1], p[1][1][1]
+#pragma xmp nodes n [1][1][1]// выделяем 1 узел  --p[0][0][0]
 #pragma xmp distribute t[block][block][block] onto n// распределяем массив t между набором узлов n
 #pragma xmp align p [i][j][k] with t[i][j][k]//выравниваем массив p по шаблону t
 #pragma xmp align bnd [i][j][k] with t[i][j][k]
@@ -115,7 +115,7 @@ main()
   /*
    *    Start measuring
    */
-  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в мапять ускорителя
+  #pragma acc enter data copyin(p, bnd, wrk1, wrk2, a, b, c)//передает распределенные массивы из памяти хоста в память ускорителя
  {
   cpu0 = second();
   gosa = jacobi(nn);

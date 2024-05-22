@@ -69,9 +69,9 @@
 #define MX0     256
 #define MY0     256
 #define MZ0     512
-#define MIMAX     256
-#define MJMAX     256
-#define MKMAX     512
+#define MIMAX     355
+#define MJMAX     355
+#define MKMAX     710
 #define NDX0      1
 #define NDY0      1
 #define NDZ0      1
@@ -79,12 +79,12 @@
 
 
 #ifdef XLARGE
-#define MX0     513
-#define MY0     513
-#define MZ0     1025
-#define MIMAX     513
-#define MJMAX     513
-#define MKMAX     1025
+#define MX0     512
+#define MY0     512
+#define MZ0     1024
+#define MIMAX     512
+#define MJMAX     512
+#define MKMAX     1024
 #define NDX0      1
 #define NDY0      1
 #define NDZ0      1

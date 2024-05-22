@@ -16,5 +16,8 @@ compile_xacc:
 compile_dvmh:
 	./dvm c himenoDVMH
 
+load:
+	scp -P 2000 student_3@alex-freenas.ddns.net:/home/student_3/himeno/*.c /mnt/d/himeno
+	scp -P 2000 student_3@alex-freenas.ddns.net:/home/student_3/himeno/*.h /mnt/d/himeno
 
 

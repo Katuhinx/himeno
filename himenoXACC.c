@@ -38,7 +38,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
-#define MIDDLE
+#define LARGE
 #include "parametr.h"
 //#include <xmp.h>
 //#include "/home/katrin/omni-compiler/libxmp/xmp.h"
@@ -99,12 +99,13 @@ main()
    */
   #pragma xmp task on t[0][0][0]//узел p[0][0][0] выполняет print и выводит указанный текст на экран
   {
+   printf("PID %d", getpid());
   printf("mimax = %d mjmax = %d mkmax = %d\n",MIMAX, MJMAX, MKMAX);//размеры матрицы
   printf("imax = %d jmax = %d kmax =%d\n",imax,jmax,kmax);
   }
   
 
-  nn= 1000;//100 итерации алгоритма Якоби
+  nn= 10;//100 итерации алгоритма Якоби
   #pragma xmp task on t[0][0][0]
   {
   printf(" Start  measurement process.\n");

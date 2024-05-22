@@ -1,12 +1,13 @@
 #!/bin/sh
 
-dvmdir='/home/katrin/dvm/dvm_sys'
-export dvmbuild='Version 5.0, revision 8512, platform katrin-Virtual-Machine, build 1'
+dvmdir='/home/student_3/dvm_current/dvm_sys'
+export dvmbuild='Version 5.0, revision 8677, platform gnu-truenas, build 6'
 
 #--------------- One can customize compiler options:
-# export PCC='cc -g -O2 -fopenmp' # C compiler
-# export PCXX='c++ -g -O2 -fopenmp' # C++ compiler
-# export PFORT='f95 -g -O2 -fopenmp' # Fortran compiler
+# export PCC='mpicc -g -O3 -fopenmp' # C compiler
+# export PCXX='mpicxx -g -O3 -fopenmp' # C++ compiler
+# export PFORT='mpif77 -g -O3 -fopenmp -fallow-argument-mismatch' # Fortran compiler
+# export NVCC='/usr/local/cuda/bin/nvcc -arch=native -O3 -lineinfo -DHAVE_EXPLICIT_CAST' # NVIDIA CUDA C++ compiler
 
 #--------------- One can add libraries (additional linker flags):
 # export USER_LIBS=''
@@ -14,13 +15,22 @@ export dvmbuild='Version 5.0, revision 8512, platform katrin-Virtual-Machine, bu
 #--------------- One can set launch options:
 # export dvmwait=0 # Wait for task completion
 # export DVMH_STACKSIZE='' # Stack size to set for the task
-# export DVMH_NUM_THREADS='' # Number of CPU threads per process
+ export DVMH_PPN='1' # Number of processes per node
+ export DVMH_NUM_THREADS='14' # Number of CPU threads per process
+ export DVMH_NUM_CUDAS='1' # Number of GPUs per process
+export DVMH_CPU_PERF='0' # Performance of all cores of CPU per process
+export DVMH_CUDAS_PERF='1' # Performance of each GPU per device
+# export DVMH_NO_DIRECT_COPY=0 # Use standard cudaMemcpy functions instead of direct copying with GPU
+# export DVMH_SPECIALIZE_RTC=1 # Use specialization algorithm to reduce CUDA kernel's resources / or compile kernels during execution without changes
 
 #--------------- Debugging options:
-# export DVMH_LOGLEVEL=1 # Levels of debugging: 1 - errors only, 2 - warning, 3 - info, 4 - debug, 5 - trace
+#export DVMH_LOGLEVEL=3 # Levels of debugging: 1 - errors only, 2 - warning, 3 - info, 4 - debug, 5 - trace
 # export DVMH_LOGFILE='dvmh_%d.log' # Log file name for each process
-# export DVMH_COMPARE_DEBUG=0 # An alternative way to turn comparative debugging mode on
+
+# export DVMH_COMPARE_DEBUG=1 # An alternative way to turn comparative debugging mode on
 # export dvmsave=0 # Save convertation results
 # export dvmshow=0 # Show commands executed by the DVM driver
+#export DVMH_SCHED_TECH=2
 
 exec "$dvmdir/bin/dvm_drv" "$@"
+

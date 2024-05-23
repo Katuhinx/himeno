@@ -195,7 +195,7 @@ jacobi(int nn)
   for(n=0 ; n<nn ; ++n){
     gosa = 0.0;
 #pragma acc update device(gosa)// так как выше была выделена память на графическом процессоре для переменной gosa,то в данной строке мы обнавляем её значение(так как мы в цикле) в памяти графического процессора значением из ЦП
-
+#pragma xmp reflect(p) acc
 #pragma xmp loop [i][j][k] on t[i][j][k] //параллельное выполнение оператора цикла
 #pragma acc parallel loop reduction(+:gosa) collapse(2)//выполняется редукция над переменной gosa и все вложенные циклы превращаются в один
 
@@ -240,7 +240,6 @@ jacobi(int nn)
   /* end n loop */
   #pragma acc update host(gosa)//обновить значение в памяти ЦП из памяти графического
   
-  #pragma xmp reflect(p) acc
   #pragma xmp reduction(+:gosa)
   }
  
